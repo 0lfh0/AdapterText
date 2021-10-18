@@ -30,6 +30,7 @@ enum class EInvalidateAdaptTextReason : uint32
 	SetMaxDesiredHeight = 1 << 24,
 
 	SetTextMarquee = 1 << 25,
+	Layout = 1 << 26,
 };
 
 class FAdaptTextBase

@@ -188,6 +188,12 @@ public:
 		void SetAdaptType(ETextAdaptType InAdaptType);
 
 	UFUNCTION(BlueprintCallable, Category = "Adapter Text")
+		void SetMaxLines(float InMaxLines);
+
+	UFUNCTION(BlueprintCallable, Category = "Adapter Text")
+		void ClearMaxLines();
+
+	UFUNCTION(BlueprintCallable, Category = "Adapter Text")
 		void SetMinFontSize(int32 InMinFontSize);
 
 	UFUNCTION(BlueprintCallable, Category = "Adapter Text")
@@ -263,6 +269,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = AdapterText)
 		ETextAdaptType AdapterType = ETextAdaptType::Ellipsis;
 
+	UPROPERTY(EditAnywhere, Category = AdapterText, meta = (editcondition = "bOverride_MaxLines"))
+		float MaxLines;
+
 	UPROPERTY(EditAnywhere, Category = AdapterText)
 		int32 MinFontSize = 10;
 
@@ -332,14 +341,14 @@ public:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = AdapterText, meta = (InlineEditConditionToggle))
 		uint8 bOverride_MaxDesiredHeight : 1;
 
+	UPROPERTY(EditAnywhere, Category = AdapterText, meta = (InlineEditConditionToggle))
+		uint8 bOverride_MaxLines : 1;
+
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "AdapterText Event", meta = (DisplayName = "OnTextMarqueeEnd (Adapter Text)"))
 		FOnTextMarqueeEndEvent OnTextMarqueeEnd;
 
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "AdapterText Event", meta = (DisplayName = "OnTextFontSizeChanged (Adapter Text)"))
 		FOnTextFontSizeChangedEvent OnTextFontSizeChanged;
-
-	/*UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = AdapterText)
-		FSlateBrush TestBrush;*/
 
 protected:
 	/**

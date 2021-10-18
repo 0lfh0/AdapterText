@@ -69,6 +69,7 @@ public:
 		, _MaxDesiredHeight(FOptionalSize())
 		//SAdaptText's properties
 		, _TextAdaptType(ETextAdaptType::Ellipsis)
+		, _TextMaxLines(FOptionalSize())
 		, _TextMinFontSize(0)
 		, _TextMarqueeType(ETextMarqueeType::Default)
 		, _TextMarqueeDirection(ETextMarqueeDirection::LeftToRight)
@@ -185,6 +186,9 @@ public:
 
 		/** �ı���Ӧ���� */
 		SLATE_ATTRIBUTE(ETextAdaptType, TextAdaptType)
+
+		/** Ellipse换行模式最大行数，使用这个也可以相应的减少闪烁 */
+		SLATE_ATTRIBUTE(FOptionalSize, TextMaxLines)
 
 		/** ��С���ֺ� */
 		SLATE_ATTRIBUTE(int32, TextMinFontSize)
@@ -337,6 +341,9 @@ public:
 	/**************************** SAdaptText ********************************/
 	/**Set text adapting type*/
 	void SetTextAdaptType(const TAttribute<ETextAdaptType>& InTextAdaptType);
+
+	/** Ellipse wrap text max lines */
+	void SetTextMaxLines(const TAttribute<FOptionalSize>& InTextMaxLines);
 
 	/**Set text min font size*/
 	void SetTextMinFontSize(const TAttribute<int32>& InTextMinFontSize);

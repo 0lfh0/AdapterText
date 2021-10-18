@@ -20,11 +20,14 @@ public:
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailBuilder) override;
 
 private:
+	EVisibility GetEllipsePropertyVisibility();
 	EVisibility GetBestFitPropertyVisibility();
 	EVisibility GetMarqueePropertyVisibility();
 	EVisibility GetMarqueePropertyVisibility(uint8 InMarqueeType);
 
 	TSharedPtr<IPropertyHandle> AdapterTypeProperty;
+	TSharedPtr<IPropertyHandle> MaxLinesProperty;
+	TSharedPtr<IPropertyHandle> bOverride_MaxLinesProperty;
 	TSharedPtr<IPropertyHandle> MinFontSizeProperty;
 	TSharedPtr<IPropertyHandle> CurrentFontSizeProperty;
 	TSharedPtr<IPropertyHandle> MarqueeDirectionProperty;

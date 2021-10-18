@@ -182,7 +182,7 @@ void UAdaptText::SetJustification(ETextJustify::Type InJustification)
 
 void UAdaptText::SynchronizeProperties()
 {
-	//UE_LOG(LogTemp, Warning, TEXT("UAdaptText::SynchronizeProperties"));
+	UE_LOG(LogTemp, Warning, TEXT("UAdaptText::SynchronizeProperties"));
 	Super::SynchronizeProperties();
 	TAttribute<FText> TextBinding = GetDisplayText();
 	TAttribute<FSlateColor> ColorAndOpacityBinding = PROPERTY_BINDING(FSlateColor, ColorAndOpacity);
@@ -209,6 +209,7 @@ void UAdaptText::SynchronizeProperties()
 		MyTextBlock->SetHAlign(HorizontalAlignment);
 		MyTextBlock->SetVAlign(VerticalAlignment);
 	}
+
 	if (bOverride_WidthOverride)
 		SetWidthOverride(WidthOverride);
 	else ClearWidthOverride();
@@ -232,6 +233,10 @@ void UAdaptText::SynchronizeProperties()
 	if (bOverride_MaxDesiredHeight)
 		SetMaxDesiredHeight(MaxDesiredHeight);
 	else ClearMaxDesiredHeight();
+
+	if (bOverride_MaxLines)
+		SetMaxLines(MaxLines);
+	else ClearMaxLines();
 }
 
 void UAdaptText::ReleaseSlateResources(bool bReleaseChildren)
@@ -297,6 +302,25 @@ void UAdaptText::SetAdaptType(ETextAdaptType InAdaptType)
 	if (MyTextBlock.IsValid())
 	{
 		MyTextBlock->SetTextAdaptType(InAdaptType);
+	}
+}
+
+void UAdaptText::SetMaxLines(float InMaxLines)
+{
+	bOverride_MaxLines = true;
+	MaxLines = InMaxLines;
+	if (MyTextBlock.IsValid())
+	{
+		MyTextBlock->SetTextMaxLines(InMaxLines);
+	}
+}
+
+void UAdaptText::ClearMaxLines()
+{
+	bOverride_MaxLines = false;
+	if (MyTextBlock.IsValid())
+	{
+		MyTextBlock->SetTextMaxLines(FOptionalSize());
 	}
 }
 
@@ -528,6 +552,7 @@ void UAdaptText::PostLoad()
 
 TSharedRef<SWidget> UAdaptText::RebuildWidget()
 {
+	UE_LOG(LogTemp, Warning, TEXT("UAdaptText::RebuildWidget"));
 	MyTextBlock =
 		SNew(SAdaptText)
 		.OnTextFontSizeChanged(FOnTextFontSizeChanged::CreateUObject(this, &UAdaptText::HandleOnTextFontSizeChanged))

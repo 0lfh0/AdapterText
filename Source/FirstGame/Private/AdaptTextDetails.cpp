@@ -28,6 +28,10 @@ TSharedRef<IDetailCustomization> FAdaptTextDetails::MakeInstance()
 void FAdaptTextDetails::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
 {
 	AdapterTypeProperty = DetailBuilder.GetProperty("AdapterType");
+
+	MaxLinesProperty = DetailBuilder.GetProperty("MaxLines");
+	bOverride_MaxLinesProperty = DetailBuilder.GetProperty("bOverride_MaxLines");
+
 	MinFontSizeProperty = DetailBuilder.GetProperty("MinFontSize");
 	CurrentFontSizeProperty = DetailBuilder.GetProperty("CurrentFontSize");
 	MarqueeDirectionProperty = DetailBuilder.GetProperty("MarqueeDirection");
@@ -48,7 +52,6 @@ void FAdaptTextDetails::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
 
 	bOverride_WidthOverrideProperty = DetailBuilder.GetProperty("bOverride_WidthOverride");
 	bOverride_HeightOverrideProperty = DetailBuilder.GetProperty("bOverride_HeightOverride");
-
 	bOverride_MinDesiredWidthProperty = DetailBuilder.GetProperty("bOverride_MinDesiredWidth");
 	bOverride_MinDesiredHeightProperty = DetailBuilder.GetProperty("bOverride_MinDesiredHeight");
 	bOverride_MaxDesiredWidthProperty = DetailBuilder.GetProperty("bOverride_MaxDesiredWidth");
@@ -56,6 +59,12 @@ void FAdaptTextDetails::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
 
 	IDetailCategoryBuilder& AdaptTextCategory = DetailBuilder.EditCategory(FName("Adapter Text"));
 	AdaptTextCategory.AddProperty(AdapterTypeProperty);
+
+	AdaptTextCategory.AddProperty(MaxLinesProperty)
+		.Visibility(TAttribute<EVisibility>::Create(TAttribute<EVisibility>::FGetter::CreateSP(this, &FAdaptTextDetails::GetEllipsePropertyVisibility)));
+	AdaptTextCategory.AddProperty(bOverride_MaxLinesProperty)
+		.Visibility(TAttribute<EVisibility>::Create(TAttribute<EVisibility>::FGetter::CreateSP(this, &FAdaptTextDetails::GetEllipsePropertyVisibility)));
+
 	AdaptTextCategory.AddProperty(MinFontSizeProperty)
 		.Visibility(TAttribute<EVisibility>::Create(TAttribute<EVisibility>::FGetter::CreateSP(this, &FAdaptTextDetails::GetBestFitPropertyVisibility)));
 	AdaptTextCategory.AddProperty(CurrentFontSizeProperty)
@@ -87,6 +96,13 @@ void FAdaptTextDetails::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
 	AdaptTextCategory.AddProperty(bOverride_MinDesiredHeightProperty);
 	AdaptTextCategory.AddProperty(bOverride_MaxDesiredWidthProperty);
 	AdaptTextCategory.AddProperty(bOverride_MaxDesiredHeightProperty);
+}
+
+EVisibility FAdaptTextDetails::GetEllipsePropertyVisibility()
+{
+	uint8 AdapterType;
+	FPropertyAccess::Result Result = AdapterTypeProperty->GetValue(AdapterType);
+	return (Result == FPropertyAccess::MultipleValues || AdapterType == 0) ? EVisibility::Visible : EVisibility::Collapsed;
 }
 
 EVisibility FAdaptTextDetails::GetBestFitPropertyVisibility()
