@@ -20,6 +20,7 @@ class FAdaptTextEllipse : public FAdaptTextBase
 public:
 	FAdaptTextEllipse(const SAdaptText::FArguments& InArgs)
 	{
+		BoundText = InArgs._Text;
 		WrapTextAt = InArgs._WrapTextAt;
 		AutoWrapText = InArgs._AutoWrapText;
 		CurFont = InArgs._Font.Get();
@@ -61,19 +62,20 @@ public:
 				.OnDoubleClicked(InArgs._OnDoubleClicked)
 				.Clipping(EWidgetClipping::Inherit)
 			];
+
+		InvalidateAdaptText(EInvalidateAdaptTextReason::SetText);
 	}
 
 	void SetText(const TAttribute<FText>& InText) override
 	{
-		SetText(InText.Get());
+		FAdaptTextBase::SetText(InText);
+		BoundText = InText;
 	}
 
 	void SetText(const FText& InText) override
 	{
 		FAdaptTextBase::SetText(InText);
-		TextStr = InText.ToString();
-		TextLength = TextStr.Len();
-		EllipseIndex = TextLength;
+		BoundText = InText;
 	}
 
 	void SetFont(const TAttribute<FSlateFontInfo>& InFont) override
@@ -154,12 +156,18 @@ protected:
 		{
 			return;
 		}
+		if (EnumHasAnyFlags(EInvalidateAdaptTextReason::SetText, Reason))
+		{
+			TextStr = BoundText.Get().ToString();
+			TextLength = TextStr.Len();
+			EllipseIndex = TextLength;
+		}
 		bIsFirstTimeToEllipse = true;
 		bMaxLinesHeightInvalidate = MaxLines.IsSet() && (EnumHasAnyFlags(EInvalidateAdaptTextReason::SetFont, Reason) || EnumHasAnyFlags(EInvalidateAdaptTextReason::Layout, Reason));
 		bLineHeightInvalidate = EnumHasAnyFlags(EInvalidateAdaptTextReason::SetFont, Reason);
 		//加个裁切，缓解下闪烁
 		MySizeBox->SetClipping(EWidgetClipping::ClipToBounds);
-		UE_LOG(LogTemp, Warning, TEXT("FAdaptTextEllipse  OnInvalidate  BoxSize:%s"), *AllottedGeometry.GetLocalSize().ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("FAdaptTextEllipse  OnInvalidate  BoxSize:%s"), *AllottedGeometry.GetLocalSize().ToString());
 	}
 
 	void OnTick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override
@@ -172,7 +180,7 @@ protected:
 		CacheTextSize = MyTextBlock->GetDesiredSize();
 		if (CacheGeometryScale != AllottedGeometry.Scale)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("OnTick  CacheGeometryScale != GeometryScale  CacheGeometryScale:%f  GeometryScale:%f  BoxSize:%s  TextSize:%s"), CacheGeometryScale, AllottedGeometry.Scale, *CacheBoxSize.ToString(), *CacheTextSize.ToString());
+			//UE_LOG(LogTemp, Warning, TEXT("OnTick  CacheGeometryScale != GeometryScale  CacheGeometryScale:%f  GeometryScale:%f  BoxSize:%s  TextSize:%s"), CacheGeometryScale, AllottedGeometry.Scale, *CacheBoxSize.ToString(), *CacheTextSize.ToString());
 			bLineHeightInvalidate = true;
 			bMaxLinesHeightInvalidate = true;
 		}
@@ -210,14 +218,16 @@ private:
 	{
 		if (MaxLines.IsSet())
 		{
-			float MaxHeight = CacheLineHeight;
+			float MaxHeight = CacheMaxLinesHeight;
 			if (!bUseCachePriority || LineHeight <= 0.f)
 			{
 				ComputeSuffixSize(0.15f);
 				GetRetRealLineHeight(MaxHeight);
-				UE_LOG(LogTemp, Log, TEXT("UpdateMaxDesiredHeight111   LineHeight:%f  MaxHeight:%f"), LineHeight, MaxHeight);
+				MaxHeight = FMath::CeilToInt(MaxHeight * MaxLines.Get());
+				CacheLineHeight = LineHeight;
+				CacheMaxLinesHeight = MaxHeight;
+				//UE_LOG(LogTemp, Log, TEXT("UpdateMaxDesiredHeight111   LineHeight:%f  MaxHeight:%f"), LineHeight, MaxHeight);
 			}
-			MaxHeight = FMath::CeilToInt(MaxHeight * MaxLines.Get());
 
 			if (CacheBoxMaxHeight.IsSet())
 			{
@@ -225,7 +235,7 @@ private:
 			}
 			
 			FAdaptTextBase::SetMaxDesiredHeight(MaxHeight);
-			UE_LOG(LogTemp, Log, TEXT("UpdateMaxDesiredHeight   LineHeight:%f  MaxHeight:%f"), LineHeight, MaxHeight);
+			//UE_LOG(LogTemp, Log, TEXT("UpdateMaxDesiredHeight   LineHeight:%f  MaxHeight:%f"), LineHeight, MaxHeight);
 		}
 		else
 		{
@@ -280,7 +290,7 @@ private:
 		//LineHeight偏差明显(但总会比实际的偏小)，可以通过GetLineHeightOffset获取大概的偏差值
 		LineHeight = SuffixSize.Y;
 		LineHeightOffset = GetLineHeightOffset(FontScale);
-		UE_LOG(LogTemp, Warning, TEXT("SuffixSize:%s  TextSize:%s   FontScale:%f"), *SuffixSize.ToString(), *CacheTextSize.ToString(), FontScale);
+		//UE_LOG(LogTemp, Warning, TEXT("SuffixSize:%s  TextSize:%s   FontScale:%f"), *SuffixSize.ToString(), *CacheTextSize.ToString(), FontScale);
 	}
 
 	void ComputeMaxLinesHeight(const float& TextHeight, const bool&& bIsSingleLine = false)
@@ -295,7 +305,7 @@ private:
 		if (!bIsSingleLine)
 		{
 			LinesNum = TextHeight / LineHeight;
-			UE_LOG(LogTemp, Log, TEXT("ComputeMaxLinesHeight  TextHeight:%f  LineHeight:%f  LinesNum:%f"), TextHeight, LineHeight, LinesNum);
+			//UE_LOG(LogTemp, Log, TEXT("ComputeMaxLinesHeight  TextHeight:%f  LineHeight:%f  LinesNum:%f"), TextHeight, LineHeight, LinesNum);
 			LinesNum = FMath::FloorToInt(LinesNum);
 		}
 		float RealLineHeight = TextHeight / LinesNum;
@@ -303,23 +313,26 @@ private:
 		GetRetRealLineHeight(RetRealLineHeight);
 		float Offset = RetRealLineHeight - RealLineHeight;
 		//OffsetTable中每个区间的偏差不超过2.0
+		//自适应宽度且AutoWrapText下第一次给的高度不对
 		if (Offset < 0 || Offset > 2.f)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("ComputeMaxLinesHeight  The Offset between the RealLineHeight and the RetRealLineHeight is too large!!!"));
+			//UE_LOG(LogTemp, Warning, TEXT("ComputeMaxLinesHeight  The Offset between the RealLineHeight and the RetRealLineHeight is too large!!!"));
 			return;
 		}
 
 		CacheLineHeight = RealLineHeight;
 		CacheMaxLinesHeight = FMath::CeilToInt(RetRealLineHeight * MaxLinesNum);
 		UpdateMaxDesiredHeight();
-		UE_LOG(LogTemp, Log, TEXT("ComputeMaxLinesHeight   MaxLinesNum:%f   CacheMaxLinesHeight:%f, CacheLineHeight:%f,  LinesNum:%f  TextHeight:%f   LineHeight:%f"), MaxLinesNum, CacheMaxLinesHeight, CacheLineHeight, LinesNum, TextHeight, LineHeight);
+		//UE_LOG(LogTemp, Log, TEXT("ComputeMaxLinesHeight   MaxLinesNum:%f   CacheMaxLinesHeight:%f, CacheLineHeight:%f,  LinesNum:%f  TextHeight:%f   LineHeight:%f"), MaxLinesNum, CacheMaxLinesHeight, CacheLineHeight, LinesNum, TextHeight, LineHeight);
 	}
 
 	void UpdateSizeWithMaxLines(FVector2D& BoxSize)
 	{
 		if (MaxLines.IsSet())
 		{
-			BoxSize.Y = FMath::Min(BoxSize.Y, CacheMaxLinesHeight);
+			//UE_LOG(LogTemp, Log, TEXT("UpdateSizeWithMaxLines  BoxSize.Y:%f  CacheLineHeight:%f  CacheMaxLinesHeight:%f"), BoxSize.Y, CacheLineHeight, CacheMaxLinesHeight);
+			//SizeToContent下，Scale变化时，BoxSize需要下一帧才会更新,所以这里只要偏差在一行以内直接用CacheMaxLinesHeight
+			BoxSize.Y = FMath::Min(BoxSize.Y + CacheLineHeight, CacheMaxLinesHeight);
 		}
 	}
 
@@ -327,18 +340,15 @@ private:
 	{
 		bool bHasResize = false;
 
-		static float LastReduceBoxWidth = 0.f;
-		static float LastReduceTextHeight = 0.f;
-
 		if (BoxSize.Y >= TextSize.Y && EllipseIndex < TextLength && (bForceResize || BoxSize.X >= LastReduceBoxWidth + 2 || BoxSize.Y >= LastReduceTextHeight))
 		{
-			//UE_LOG(LogTemp, Log, TEXT("ResizeWrapText ++   BoxSize.Y:%f  TextSize.Y:%f"), BoxSize.Y, TextSize.Y);
+			//UE_LOG(LogTemp, Log, TEXT("ResizeWrapText ++   BoxSize.Y:%f  TextSize.Y:%f  EllipseIndex:%d"), BoxSize.Y, TextSize.Y, EllipseIndex);
 			EllipseIndex++;
 			bHasResize = true;
 		}
 		else if (BoxSize.Y < TextSize.Y && EllipseIndex > 0)
 		{
-			//UE_LOG(LogTemp, Log, TEXT("ResizeWrapText --   BoxSize.Y:%f  TextSize.Y:%f"), BoxSize.Y, TextSize.Y);
+			//UE_LOG(LogTemp, Log, TEXT("ResizeWrapText --   BoxSize.Y:%f  TextSize.Y:%f   EllipseIndex:%d"), BoxSize.Y, TextSize.Y, EllipseIndex);
 			LastReduceBoxWidth = BoxSize.X;
 			LastReduceTextHeight = TextSize.Y;
 			EllipseIndex--;
@@ -362,7 +372,6 @@ private:
 	bool EllipseWrapText(const float& GeometryScale, FVector2D BoxSize, FVector2D TextSize)
 	{
 		bool bHasResize = false;
-		static FVector2D CacheWrapBoxSize = FVector2D::ZeroVector;
 
 		UpdateSizeWithMaxLines(BoxSize);
 
@@ -388,8 +397,7 @@ private:
 			FastSize = LinesNum * FastSize - SuffixSize.X;
 			int32 FastIndex = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->FindCharacterIndexAtOffset(TextStr, CurFont, FastSize);
 			FastIndex = FMath::Clamp(FastIndex, 0, TextLength);
-
-			UE_LOG(LogTemp, Warning, TEXT("EllipseWrapText FastEllipse    LinesNum:%f  TextLength:%d  EllipseIndex:%d  FastIndex:%d"), LinesNum, TextLength, EllipseIndex, FastIndex);
+			//UE_LOG(LogTemp, Warning, TEXT("EllipseWrapText FastEllipse  BoxSize.Y:%f  LineHeight:%f  LinesNum:%f  TextLength:%d  EllipseIndex:%d  FastIndex:%d"), BoxSize.Y, LineHeight, LinesNum, TextLength, EllipseIndex, FastIndex);
 			if (FastIndex != EllipseIndex)
 			{
 				EllipseIndex = FastIndex;
@@ -414,24 +422,23 @@ private:
 		}
 
 		//微调
-		int32 ResizeCount = 0;  //计算次数
-		while (ResizeWrapText(BoxSize, TextSize))
+		//int32 ResizeCount = 0;  //计算次数
+		while (ResizeWrapText(BoxSize, TextSize))		
 		{
-			TextSize = MyTextBlock->ComputeDesiredSize(GeometryScale);
-#if WITH_EDITOR
+			//宽度自适应时需要计算多次才能得到正确的结果
+			TextSize = MyTextBlock->ComputeDesiredSize(0.15f);
 			//在Editor中打开蓝图时，首帧得到的Scale是1:1，TextSize也是1:1下的到结果
 			//但是次帧开始Scale为0.5(打开蓝图默认缩放为-4)，然后TextSize还是1:1下的结果，除非手动点编译或缩放屏幕才会重新计算
 			//是不是应该InvalidateText
 			TextSize.Y = FMath::FloorToInt(TextSize.Y / CacheLineHeight) * CacheLineHeight;
-#endif
-			//UE_LOG(LogTemp, Log, TEXT("while BoxSize:%s  TextSize:%s   ========================"), *BoxSize.ToString(), *TextSize.ToString());
+			//UE_LOG(LogTemp, Log, TEXT("while BoxSize:%s  TextSize:%s========================"), *BoxSize.ToString(), *TextSize.ToString());
 			bHasResize = true;
-			ResizeCount++;
+			//ResizeCount++;
 		}
-		if (ResizeCount > 0)
+		/*if (ResizeCount > 0)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("ResizeCount:%d  EllipseIndex:%d"), ResizeCount, EllipseIndex);
-		}
+		}*/
 
 		return bHasResize;
 	}
@@ -439,11 +446,10 @@ private:
 	bool EllipseNoWrapText(const float& GeometryScale, const FVector2D& BoxSize, FVector2D TextSize)
 	{
 		bool bHasResize = false;
-		static float CacheTextDesiredWidth = 0.f;
-		static float CacheBoxWidth = 0.f;
 		
 		if (bIsFirstTimeToEllipse || CacheBoxWidth != BoxSize.X)
 		{
+			//UE_LOG(LogTemp, Log, TEXT("EllipseNoWrapText  bIsFirstTimeToEllipse:%d  CacheBoxWidth:%f   BoxSize.X:%f"), bIsFirstTimeToEllipse, CacheBoxWidth, BoxSize.X);
 			CacheBoxWidth = BoxSize.X;
 			int32 FastIndex = 0;
 			//SizeToContent的情况下，BoxSize等于TextSize，但是TextSize会根据GeometryScale变化，所以BoxSize也会变化
@@ -453,6 +459,7 @@ private:
 				CacheTextDesiredWidth = CacheTextDesiredWidth / GeometryScale + 1.f;
 				//Ellipse后文本会变短，这期间要是SizeToContent的话就得不到原来的宽度，所以提前加个MinDesiredWidth
 				MySizeBox->SetMinDesiredWidth(CacheBoxMinWidth.IsSet() ? FMath::Min(CacheBoxMinWidth.Get(), CacheTextDesiredWidth) : CacheTextDesiredWidth);
+				//UE_LOG(LogTemp, Log, TEXT("EllipseNoWrapText  CacheBoxMinWidth.IsSet():%d  CacheTextDesiredWidth:%f "), CacheBoxMinWidth.IsSet(), CacheTextDesiredWidth);
 			}
 
 			if (BoxSize.X >= CacheTextDesiredWidth)
@@ -463,7 +470,7 @@ private:
 			{
 				FastIndex = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->FindCharacterIndexAtOffset(TextStr, CurFont, BoxSize.X - SuffixSize.X);
 				FastIndex = FMath::Clamp(FastIndex, 0, TextLength);
-				UE_LOG(LogTemp, Warning, TEXT("EllipseNoWrapText  FastIndex:%d  Str:%s"), FastIndex, *TextStr.Left(FastIndex));
+				//UE_LOG(LogTemp, Warning, TEXT("EllipseNoWrapText  FastIndex:%d  Str:%s"), FastIndex, *TextStr.Left(FastIndex));
 			}
 
 			if (FastIndex != EllipseIndex)
@@ -502,6 +509,7 @@ private:
 
 private:
 	FSlateFontInfo CurFont;
+	TAttribute<FText> BoundText;
 	TAttribute<float> WrapTextAt;
 	TAttribute<bool> AutoWrapText;
 	FOptionalSize CacheBoxMinWidth;
@@ -522,13 +530,19 @@ private:
 	int32 EllipseIndex = 0;//当前Ellipse的Index
 
 	const FString Suffix = TEXT("...");//省略符号
-	FVector2D SuffixSize;              //省略符号的Size
+	FVector2D SuffixSize;              //省略符号Size
 
 	FVector2D CacheBoxSize;       //缓存Geometry的Size，考虑到要是SetText等可以提前Ellipse，可以缓解闪烁
 	FVector2D CacheTextSize;      //缓存TextSize
 	float CacheGeometryScale = -1;//缓存Geometry的Scale
 	bool bIsFirstTimeToEllipse = false;
 	bool bForceResize = false;
+
+	float CacheTextDesiredWidth = 0.f;
+	float CacheBoxWidth = 0.f;
+	FVector2D CacheWrapBoxSize = FVector2D::ZeroVector;
+	float LastReduceBoxWidth = 0.f;
+	float LastReduceTextHeight = 0.f;
 };
 
 class FAdaptTextBestFit : public FAdaptTextBase

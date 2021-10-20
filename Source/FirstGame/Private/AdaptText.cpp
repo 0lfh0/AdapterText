@@ -182,7 +182,7 @@ void UAdaptText::SetJustification(ETextJustify::Type InJustification)
 
 void UAdaptText::SynchronizeProperties()
 {
-	UE_LOG(LogTemp, Warning, TEXT("UAdaptText::SynchronizeProperties"));
+	//UE_LOG(LogTemp, Warning, TEXT("UAdaptText::SynchronizeProperties"));
 	Super::SynchronizeProperties();
 	TAttribute<FText> TextBinding = GetDisplayText();
 	TAttribute<FSlateColor> ColorAndOpacityBinding = PROPERTY_BINDING(FSlateColor, ColorAndOpacity);
@@ -552,7 +552,7 @@ void UAdaptText::PostLoad()
 
 TSharedRef<SWidget> UAdaptText::RebuildWidget()
 {
-	UE_LOG(LogTemp, Warning, TEXT("UAdaptText::RebuildWidget"));
+	//UE_LOG(LogTemp, Warning, TEXT("UAdaptText::RebuildWidget"));
 	MyTextBlock =
 		SNew(SAdaptText)
 		.OnTextFontSizeChanged(FOnTextFontSizeChanged::CreateUObject(this, &UAdaptText::HandleOnTextFontSizeChanged))
